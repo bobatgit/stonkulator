@@ -1,5 +1,14 @@
-panel
-yfinance
-pyngrok
-plotly
-bokeh
+# Stonkulator MVP 1 - Cloud Run Dependencies
+# Financial data and analysis
+yfinance==0.2.*
+pandas==2.0.*
+numpy==1.24.*
+
+# Visualization and dashboard
+panel==1.3.*
+plotly==5.17.*
+bokeh==3.3.*
+
+# Core dependencies for Panel
+tornado>=6.0
+param>=2.0

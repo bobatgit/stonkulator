@@ -5,13 +5,13 @@
 **Created on**: 2025-08-09
 **Last updated**: 2025-09-14
 **Version**: 1.0
-**Development Environment**: GCP Cloud Functions, Python, Panel
+**Development Environment**: GCP Cloud Run, Python, Panel
 
 ### 1. **Project Overview** (End-user requirements)
 
 **Purpose:** Stonkulator is a personal stock market dashboard built in python using the Panel and yFinance libraries. Its goal is to display stock market data for selected financial instruments as charts and calculate returns, key statistics and run simulations of relevant market information.
 
-**Solution:** A serverless dashboard using Panel and yFinance deployed via GCP Cloud Functions to display key instrument information across multiple panels. Each panel is dedicated to one goal. The architecture uses modular cloud functions for scalability. Data is cached to improve performance.
+**Solution:** A containerized dashboard using Panel and yFinance deployed via GCP Cloud Run to display key instrument information across multiple panels. Each panel is dedicated to one goal. The architecture uses containerized microservices for scalability and flexibility. Data is cached to improve performance.
 
 **Goals:** 
 1. Single instrument analysis section with a chart and multiple technical indicators.
@@ -40,15 +40,15 @@
 ### 2. **System Architecture**
 
 **Technology Stack:**
-1. **Frontend:** Panel-powered dashboard served via GCP Cloud Functions.
-2. **Backend:** Python-based GCP Cloud Functions handling API endpoints and dashboard serving; logic is modularized across multiple cloud functions for scalability and maintainability.
+1. **Frontend:** Panel-powered dashboard served via GCP Cloud Run containers.
+2. **Backend:** Python-based GCP Cloud Run services handling API endpoints and dashboard serving; logic is modularized across multiple containerized microservices for scalability and maintainability.
 3. **Data Source:** yFinance API provides live stock / financial instrument data. Data is cached to improve performance to a DuckDB database. The architecture is organized for a timeseries friendly querying approach. 
 4. **Persistence:** Cloud Storage for DuckDB database files containing market data. No user portfolio data persisted in cloud - uses default S&P 500 or temporary session uploads.
 
 **Major Components:**
-- **Cloud Function - Config Service:** Accepts optional user portfolio uploads and provides default S&P 500 portfolio when none provided. No persistent user data storage in cloud.
-- **Cloud Function - Data Service:** Pulls live data with yFinance for all instruments. Performs additional calculations. Keeps at least 5 years of daily data for each instrument. Manages data freshness by checking for new daily data. Uses DuckDB as core backend database with files stored in Cloud Storage.
-- **Cloud Function - Dashboard Service:** Serves the Panel-powered dashboard with HTTP triggers. Handles frontend routing and rendering.
+- **Cloud Run - Config Service:** Containerized service that accepts optional user portfolio uploads and provides default S&P 500 portfolio when none provided. No persistent user data storage in cloud.
+- **Cloud Run - Data Service:** Containerized service that pulls live data with yFinance for all instruments. Performs additional calculations. Keeps at least 5 years of daily data for each instrument. Manages data freshness by checking for new daily data. Uses DuckDB as core backend database with files stored in Cloud Storage.
+- **Cloud Run - Dashboard Service:** Containerized service that serves the Panel-powered dashboard with HTTP endpoints. Handles frontend routing and rendering with persistent connections support.
 - Frontend / Chart view: single instrument viewer panel with a large stock chart and key statistics, and technical indicators.
 - Frontend / Portfolio view: list of instruments in the users portfolio with key statistics calculated for each.
 - Frontend / Efficient frontier view: simulation of the efficient frontier from all available instruments.
@@ -59,11 +59,11 @@
 classDiagram
   direction LR
   User Upload --> Config Service : optional portfolio data
-  Config Service --> Data Service : configures instruments
-  Config Service --> Config View : displays settings
+  Config Service --> Data Service : configures instruments via HTTP
+  Config Service --> Dashboard Service : provides config via HTTP
   yFinance --> Data Service : refreshes market data
   Data Service --> Cloud Storage : persists DuckDB files
-  Data Service --> Dashboard Service : provides data
+  Data Service --> Dashboard Service : provides data via HTTP
   Dashboard Service --> Chart View : renders charts
   Dashboard Service --> Portfolio View : renders portfolio
   Dashboard Service --> Efficient Frontier View : renders analysis
@@ -73,23 +73,23 @@ classDiagram
 
 
 **Key Decisions:**
-- GCP Cloud Functions chosen for serverless architecture, automatic scaling, and pay-per-use pricing model.
-- Cloud Storage used for DuckDB database persistence with easy integration to Cloud Functions. No user config files stored persistently.
-- Panel was chosen over Streamlit because its part of the Jupyter ecosystem and works well with serverless deployments.
+- GCP Cloud Run chosen for containerized architecture, automatic scaling, persistent connections support, and pay-per-use pricing model with better resource flexibility than Cloud Functions.
+- Cloud Storage used for DuckDB database persistence with easy integration to Cloud Run services. No user config files stored persistently.
+- Panel was chosen over Streamlit because its part of the Jupyter ecosystem and works well with containerized deployments, supporting persistent connections for real-time updates.
 - yFinance provides free and very reliable stock data, including critically important adjusted close data. Good enough for this level of analysis.
 - DuckDB retained as the database choice due to its excellent analytical performance and file-based nature that works well with Cloud Storage.
-- Cloud Functions provide better reliability and availability compared to notebook-based serving approaches.
+- Cloud Run provides better reliability, availability, and flexibility for Panel applications compared to Cloud Functions, with support for WebSocket connections and longer execution times.
 
 ### 3. **Implementation Plan**
 
 1. **MVP 1: Basic Data Pipeline**: User can access a dashboard showing live stock data for one ticker (^GSPC).
-	- [ ] Set up GCP project and enable Cloud Functions, Cloud Storage APIs
-	- [ ] Create basic Cloud Function with Panel app fetching one stock with yFinance
-	- [ ] Deploy Cloud Function with HTTP trigger
-	- [ ] Chart View: display basic stock price chart served via Cloud Function
+	- [ ] Set up GCP project and enable Cloud Run, Cloud Storage APIs
+	- [ ] Create Dockerfile for containerized Panel app fetching one stock with yFinance
+	- [ ] Build and deploy Cloud Run service with HTTP endpoint
+	- [ ] Chart View: display basic stock price chart served via Cloud Run container
 
 2. **MVP 2: User Configuration**: User can load list of instruments to see their data.
-	- [ ] Create Config Service Cloud Function that accepts optional portfolio uploads
+	- [ ] Create Config Service Cloud Run container that accepts optional portfolio uploads
 	- [ ] Implement default S&P 500 portfolio when no custom portfolio provided
 	- [ ] Make settings view to confirm what portfolio is loaded (default or custom)
 	- [ ] Pick instrument from list to change stock chart via Dashboard Service
@@ -102,9 +102,9 @@ classDiagram
 
 
 4. **MVP 4: Data Persistence**: Data is stored between sessions, loads quickly and only minimal new data is requested from yFinance.
-	- [ ] Set up Data Service Cloud Function with DuckDB for storage with two tables: instrument and daily_prices
+	- [ ] Set up Data Service Cloud Run container with DuckDB for storage with two tables: instrument and daily_prices
 	- [ ] Configure Cloud Storage bucket for DuckDB file persistence
-	- [ ] Load/save DuckDB files from Cloud Storage on function execution
+	- [ ] Load/save DuckDB files from Cloud Storage on container startup/shutdown
 	- [ ] Add automatic data refresh from yFinance based on today's date
 	- [ ] Add caching to all charts (for Panel end-user performance improvement)
 
