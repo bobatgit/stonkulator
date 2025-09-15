@@ -26,6 +26,10 @@ USER app
 EXPOSE 8080
 
 # Health check
+# Not yet implemented in main.py, but here is how you would do it
+# 1. Implement a /health endpoint in main.py that returns 200 OK
+# 2. Cloud Run will use this to check the health of the container
+# Note: Cloud Run has its own health check mechanism, so this is optional
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
